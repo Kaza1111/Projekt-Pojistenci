@@ -8,15 +8,34 @@ class Databaze:
 #přidá pojištence do databáze
     def pridat_pojistence(self):
         
-        jmeno = input("Zadejte své jméno:\n")
-        prijmeni = input("Zadejte své prijmeni:\n")
+        jmeno = self.ziskej_text("Zadejte své jméno:\n",povinny_text=True)
+        prijmeni = self.ziskej_text("Zadejte své prijmeni:\n", povinny_text=True)
         vek = self.ziskej_cislo("Zadejte svůj věk:\n", povinne_cislo=True)
 
         novy_pojistenec = Pojistenec(jmeno, prijmeni, vek)
         self.seznam_pojistencu.append(novy_pojistenec)
-        print("Přidali jste nového pojištence")
+        print(f"Přidali jste nového pojištence:\n{novy_pojistenec}")
 
-#ošetření víjimky: Aby se při zadávání věku nebo vyhledávání dle čísla zadal INT, v případě vyhledávání může uživatel "odentrovat"
+#ošetření výjimky: Aby se při zadávání jména nebo vyhledávání dle jména zadal text, v případě vyhledávání může uživatel "odentrovat"
+    def ziskej_text(self, zprava, povinny_text=True):
+        while True:
+            text = input(zprava)
+            if text == "":
+                if not povinny_text:
+                    return ""
+                else: print("Musíš zadat text!!!")
+            
+            else: 
+                try:
+                    for i in text:
+                        if i.isdigit():
+                            raise ValueError("Špatně jsi to zadal, chci po tobě pouze text!")
+                    break  
+                except ValueError as e:
+                    print(e)                    
+        return str(text)
+                                
+#ošetření výjimky: Aby se při zadávání věku nebo vyhledávání dle čísla zadal INT, v případě vyhledávání může uživatel "odentrovat"
     def ziskej_cislo(self, zprava, povinne_cislo=True):
         while True:
             number = input(zprava)
@@ -27,7 +46,10 @@ class Databaze:
                     print("Musíš zadat číslo.")
             else:
                 try:
-                    return int(number)
+                    if int(number) >= 0 and int(number)<= 150:
+                        return int(number)
+                    else: print("Můžeš zadat pouze reálné rozmezí od 0 do 150!!!")
+
                 except ValueError:
                     print("Špatně jsi to zadal, chci po tobě číslo, kámo")
 
@@ -40,14 +62,18 @@ class Databaze:
 #najde pojištence dle jména, příjmení, čísla, výsledek je jen return, print je ošetřen při zavolání funkce
     def najit_pojistence(self):
 
-        najit_jmeno = input("Zadejte jméno, které chcete najít:\n")
-        najit_prijmeni = input("Zadejte příjmení, které chcete najít:\n")
+        najit_jmeno = self.ziskej_text("Zadejte jméno, které chcete najít:\n", povinny_text=False)
+        najit_prijmeni = self.ziskej_text("Zadejte příjmení, které chcete najít:\n", povinny_text=False)
         najit_cislo = self.ziskej_cislo("Zadejte číslo pojištence, které chcete najít:\n", povinne_cislo=False)
 
+        nalezeno = ""
         for pojistenec in self.seznam_pojistencu:
             if najit_jmeno == pojistenec.jmeno or najit_prijmeni == pojistenec.prijmeni or najit_cislo == pojistenec.cislo:
+                nalezeno = pojistenec
                 return pojistenec
-        print("Uživatel nebyl nalezen")
+            
+            if nalezeno == "":
+                print("Uživatel nebyl nalezen")
 
 #smaže pojištěnce tak, že ho nejdříve najde využitím metody "nait_pojostence" a pak ho smaže  
     def smazat_pojistence(self):
@@ -100,7 +126,8 @@ class Databaze:
             print("Pokud chcete nějakého pojištence UPRAVIT, stiskněte --5--")
             print("Pokud chcete UKONČIT aplikaci, stiskněte --6--")
 
-            volba = input("Zadejte vaši volbu:\n")
+            volba = input("Zadejte vaši volbu:\t")
+            print("XXXXXX")
 
             if volba == "1":
                 self.pridat_pojistence()
