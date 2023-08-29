@@ -1,9 +1,24 @@
 from pojistenec import Pojistenec
+import sqlite3
 
 #vytvoření classy Databaze, kde při jejím zavolání bude vytvořenen seznam pojištěnců 
 class Databaze:
-    def __init__(self):
-        self.seznam_pojistencu = []
+    def __init__(self, db_name):
+        self.db_name = db_name
+        self.conn = sqlite3.connect(self.db_name)
+        self.cursor = self.conn.cursor()
+        self.create_table()
+    
+    def create_table(self):
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS pojistenci (
+                id INTEGER PRIMARY KEY,
+                jmeno TEXT,
+                prijmeni TEXT,
+                vek INTEGER
+            )
+        ''')
+        self.conn.commit()
 
 #přidá pojištence do databáze
     def pridat_pojistence(self):
@@ -12,9 +27,14 @@ class Databaze:
         prijmeni = self.ziskej_text("Zadejte své prijmeni:\n", povinny_text=True)
         vek = self.ziskej_cislo("Zadejte svůj věk:\n", povinne_cislo=True)
 
-        novy_pojistenec = Pojistenec(jmeno, prijmeni, vek)
-        self.seznam_pojistencu.append(novy_pojistenec)
-        print(f"Přidali jste nového pojištence:\n{novy_pojistenec}")
+        self.conn.execute('''
+            INSERT INTO pojistenci (jmeno, prijmeni, vek)
+            VALUES (?, ?, ?)
+        ''', (jmeno, prijmeni, vek))
+
+        self.conn.commit()
+
+        print(f"Přidali jste nového pojištence:\n{jmeno} {prijmeni}, Věk: {vek}")
 
 #ošetření výjimky: Aby se při zadávání jména nebo vyhledávání dle jména zadal text, v případě vyhledávání může uživatel "odentrovat"
     def ziskej_text(self, zprava, povinny_text=True):
@@ -56,59 +76,84 @@ class Databaze:
 #vypíše pojištence
     def vypis_pojistence(self):
 
-        for pojistenec in self.seznam_pojistencu:
-            print(pojistenec)
+        self.cursor.execute('SELECT * FROM pojistenci')
+        records = self.cursor.fetchall()
+
+        print("ID".ljust(10), "JMÉNO".ljust(10), "PŘÍJMENÍ".ljust(10), "VĚK".ljust(10))
+        for record in records:
+            id, jmeno, prijmeni, vek = record
+            print(f"{str(id).ljust(10)} {str(jmeno).ljust(10)} {str(prijmeni).ljust(10)} {str(vek).ljust(10)} ")
 
 #najde pojištence dle jména, příjmení, čísla, výsledek je jen return, print je ošetřen při zavolání funkce
+
     def najit_pojistence(self):
 
-        najit_jmeno = self.ziskej_text("Zadejte jméno, které chcete najít:\n", povinny_text=False)
-        najit_prijmeni = self.ziskej_text("Zadejte příjmení, které chcete najít:\n", povinny_text=False)
-        najit_cislo = self.ziskej_cislo("Zadejte číslo pojištence, které chcete najít:\n", povinne_cislo=False)
+        id = self.ziskej_cislo("Zadejte id, které chcete najít:\n", povinne_cislo=False)
+        jmeno = self.ziskej_text("Zadejte jméno, které chcete najít:\n", povinny_text=False)
+        prijmeni = self.ziskej_text("Zadejte příjmení, které chcete najít:\n", povinny_text=False)
+        vek = self.ziskej_cislo("Zadejte věk, které chcete najít:\n", povinne_cislo=False)
 
-        nalezeno = ""
-        for pojistenec in self.seznam_pojistencu:
-            if najit_jmeno == pojistenec.jmeno or najit_prijmeni == pojistenec.prijmeni or najit_cislo == pojistenec.cislo:
-                nalezeno = pojistenec
-                return pojistenec
-            
-            if nalezeno == "":
-                print("Uživatel nebyl nalezen")
+        query = "SELECT * FROM pojistenci"
+        conditions = []
+        values = []
+
+        if id:
+            conditions.append(f"id = ?")
+            values.append(id)
+        if jmeno:
+            conditions.append(f"jmeno = ?")
+            values.append(jmeno)
+        if prijmeni:
+            conditions.append(f"prijmeni = ?")
+            values.append(prijmeni)
+        if vek:
+            conditions.append(f"vek = ?")
+            values.append(vek)
+
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+
+        self.cursor.execute(query, values)
+        records = self.cursor.fetchall()
+
+        if records:
+            for record in records:
+                id, jmeno, prijmeni, vek = record
+                print(f"ID: {id}, Jméno: {jmeno}, Příjmení: {prijmeni}, Věk: {vek}")
+            return records
+        else:
+            print("Pojištěnci nebyli nalezeni.")
+            return None
 
 #smaže pojištěnce tak, že ho nejdříve najde využitím metody "nait_pojostence" a pak ho smaže  
     def smazat_pojistence(self):
 
-        print("Pojďme si nejprave najít, toho, jehož jméno se nevyslovuje a kterého chceme smáznout")
-        nalezeny_pojistenec = self.najit_pojistence()
-
-        if nalezeny_pojistenec is not None:
-            self.seznam_pojistencu.remove(nalezeny_pojistenec)
-            print("Pojištěnec byl smazán, můžeme si to ověřit vypsáním databáze níže:")
-            self.vypis_pojistence()
+        found_pojistenci = self.najit_pojistence()
+        if found_pojistenci:
+            for pojistenec in found_pojistenci:
+                self.cursor.execute(f"DELETE FROM pojistenci WHERE id = {pojistenec[0]}")
+            self.conn.commit()
+            print("Pojištěnci byli smazáni.")
         else:
-            print("Uživatel nebyl nalezen, a proto nemůže být logicky smazán")
+            print("Pojištěnci nebyli nalezeni.")
 
 #upraví pojištence ta, že ho nejdříve najde pomocí metody "najit_pojistence" 
     def upravit_pojistence(self):
 
-        print("Nejprve pojďme najít pojištence, kterého chcete upravit...")
-        nalazeny_pojistenec = self.najit_pojistence()
+        found_pojistenci = self.najit_pojistence()
+        if found_pojistenci:
+            for pojistenec in found_pojistenci:
+                nove_jmeno = self.ziskej_text("Zadej nové jméno", povinny_text=True)
+                nove_prijmeni = self.ziskej_text("Zadej nové jméno", povinny_text=True)
+                novy_vek = self.ziskej_cislo("Zadejte nový věk:\n", povinne_cislo= True)
 
-        if nalazeny_pojistenec is not None:
-    
-            nove_jmeno = input("Zadejte nové jméno:\n")
-            nove_prijmeni = input("Zadejte nové příjmneí")
-            novy_vek = self.ziskej_cislo("Zadejte nový věk:\n")
+                self.cursor.execute(f"UPDATE pojistenci SET jmeno = '{nove_jmeno}', prijmeni = '{nove_prijmeni}', vek = {novy_vek} WHERE id = {pojistenec[0]}")
+                self.conn.commit()
 
-            nalazeny_pojistenec.jmeno = nove_jmeno
-            nalazeny_pojistenec.prijmeni = nove_prijmeni
-            nalazeny_pojistenec.vek = novy_vek
-
-            print("Pojištenec byl upraven na:")
-            print(nalazeny_pojistenec)
-        
-        else: 
-            print("Uživatel nebyl nalezen, proto se nemůže upravit")
+                print("Pojištěnec byl upraven na:")
+                print((pojistenec[0], nove_jmeno, nove_prijmeni, novy_vek))
+        else:
+            print("Pojištěnci nebyli nalezeni nebo nebyly zadány kritéria pro úpravu.")
 
 #tato metoda zapne celou aplikaci, je to lepší vypsat zde, aby main nebyl zahlcen
     def startuj(self):
